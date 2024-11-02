@@ -1,9 +1,5 @@
-
 #include <Arduino.h>
 #include <SoftwareSerial.h>
-
-
-
 
 #define ALARM_PIN 12
 #define TXD 6
@@ -16,83 +12,115 @@ unsigned long buttonOnePressTime = 0;
 bool buttonOneLongPressDetected = false;
 const unsigned long longPressDuration = 2000; // 2 seconds for long press detection
 
-
+// Add debounce variables for sensor readings
+const int numReadings = 5;
+int readings[numReadings];
+int readIndex = 0;
+int total = 0;
+int average = 0;
 
 SoftwareSerial mySerial(TXD, RXD);
 
-
-void sendSms(String message) ;
+void sendSms(String message);
 void triggerAlarm();
 void overrideAlarm();
 void updateSerial();
-bool longPress(int buttonPin );
+bool longPress(int buttonPin);
 
 void setup() {
-
   pinMode(ALARM_PIN, OUTPUT);
-  pinMode(STOP_PIN, INPUT);
+  pinMode(STOP_PIN, INPUT_PULLUP);  // Enable internal pull-up resistor
   pinMode(SENSOR_PIN, INPUT);
+
+  // Initialize all readings to 0
+  for (int i = 0; i < numReadings; i++) {
+    readings[i] = 0;
+  }
 
   Serial.begin(9600);
   mySerial.begin(9600);
 
-  // send  sms to indicate working
-  sendSms("the system is working");
-
- 
- 
+  // Send SMS to indicate working
+  sendSms("The system is working");
 }
 
 void loop() {
-  int sensorValue = analogRead(SENSOR_PIN);
-  Serial.println(sensorValue);
-  updateSerial();{
-if(longPress(STOP_PIN)){
-  overrideAlarm();
-}else
-  if(sensorValue>SAFETY_LEVEL){
-    triggerAlarm();}
-else{
-  digitalWrite(ALARM_PIN, LOW);
-}}
-}
+  // Read and average sensor values
+  total = total - readings[readIndex];
+  readings[readIndex] = analogRead(SENSOR_PIN);
+  total = total + readings[readIndex];
+  readIndex = (readIndex + 1) % numReadings;
+  average = total / numReadings;
 
-void triggerAlarm(){
-  digitalWrite(ALARM_PIN, HIGH);
-  sendSms("there is gas leak detected");
-}
+  // Debug print
+  Serial.print("Raw sensor value: ");
+  Serial.print(readings[readIndex]);
+  Serial.print(" Average value: ");
+  Serial.println(average);
 
-void overrideAlarm(){
-  digitalWrite(ALARM_PIN, LOW);
-}
+  // Update serial communication
+  updateSerial();
 
-void updateSerial()
-{
-  delay(500);
-  while (Serial.available()) 
-  {
-    mySerial.write(Serial.read());//Forward what Serial received to Software Serial Port
+  // Check for long press first
+  if (longPress(STOP_PIN)) {
+    overrideAlarm();
   }
-  while(mySerial.available()) 
-  {
-    Serial.write(mySerial.read());//Forward what Software Serial received to Serial Port
+  // If no override, check gas levels
+  else if (average > SAFETY_LEVEL) {
+    triggerAlarm();
+  }
+  else {
+    digitalWrite(ALARM_PIN, LOW);
+  }
+
+  delay(100); // Small delay to prevent too frequent readings
+}
+
+void triggerAlarm() {
+  static bool alarmSent = false;  // Keep track of whether we've sent an SMS
+  
+  digitalWrite(ALARM_PIN, HIGH);
+  
+  // Only send SMS once when leak is detected
+  if (!alarmSent) {
+    sendSms("Gas leak detected!");
+    alarmSent = true;
+  }
+}
+
+void overrideAlarm() {
+  static bool overrideSent = false;  // Keep track of override notification
+  
+  digitalWrite(ALARM_PIN, LOW);
+  
+  if (!overrideSent) {
+    sendSms("Alarm has been manually overridden");
+    overrideSent = true;
+  }
+}
+
+void updateSerial() {
+  while (Serial.available()) {
+    mySerial.write(Serial.read());
+  }
+  while (mySerial.available()) {
+    Serial.write(mySerial.read());
   }
 }
 
 void sendSms(String message) {
   mySerial.println("AT+CMGF=1");    //Sets the GSM Module in Text Mode
-  delay(1000);  // Delay of 1000 milli seconds or 1 second
+  delay(1000);
   mySerial.println("AT+CMGS=\"+2347059011222\"\r"); 
   delay(1000);
-  mySerial.println(message);// The SMS text you want to send
+  mySerial.println(message);
   delay(100);
-  mySerial.println((char)26);// ASCII code of CTRL+Z
+  mySerial.println((char)26);  // ASCII code of CTRL+Z
   delay(1000);
 }
 
-
 bool longPress(int buttonPin) {
-  if (digitalRead(buttonPin) == LOW) {
+  if (digitalRead(buttonPin) == LOW) {  // Button is pressed
     if (buttonOnePressTime == 0) {
       buttonOnePressTime = millis();
     }
