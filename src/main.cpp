@@ -5,8 +5,8 @@
 #define TXD 6
 #define RXD 5
 #define STOP_PIN 8
-#define SENSOR_PIN A0
-#define SAFETY_LEVEL 100
+#define SENSOR_PIN 0
+#define SAFETY_LEVEL 400
 
 unsigned long buttonOnePressTime = 0;
 bool buttonOneLongPressDetected = false;
@@ -36,12 +36,14 @@ void setup() {
   for (int i = 0; i < numReadings; i++) {
     readings[i] = 0;
   }
+  digitalWrite(ALARM_PIN, LOW);
 
   Serial.begin(9600);
   mySerial.begin(9600);
 
   // Send SMS to indicate working
   sendSms("The system is working");
+  delay(20000); // allow the MQ2 to warm up
 }
 
 void loop() {
@@ -58,6 +60,7 @@ void loop() {
   Serial.print(" Average value: ");
   Serial.println(average);
 
+    digitalWrite(ALARM_PIN, LOW);
   // Update serial communication
   updateSerial();
 
@@ -73,7 +76,7 @@ void loop() {
     digitalWrite(ALARM_PIN, LOW);
   }
 
-  delay(100); // Small delay to prevent too frequent readings
+  delay(500); // Small delay to prevent too frequent readings
 }
 
 void triggerAlarm() {
@@ -83,6 +86,7 @@ void triggerAlarm() {
   
   // Only send SMS once when leak is detected
   if (!alarmSent) {
+    Serial.println("Gas leak detected!");
     sendSms("Gas leak detected!");
     alarmSent = true;
   }
@@ -100,6 +104,8 @@ void overrideAlarm() {
 }
 
 void updateSerial() {
+  Serial.println("Updating serial");
+  Serial.println(mySerial.available());
   while (Serial.available()) {
     mySerial.write(Serial.read());
   }
@@ -114,6 +120,7 @@ void sendSms(String message) {
   mySerial.println("AT+CMGS=\"+2347059011222\"\r"); 
   delay(1000);
   mySerial.println(message);
+
   delay(100);
   mySerial.println((char)26);  // ASCII code of CTRL+Z
   delay(1000);
