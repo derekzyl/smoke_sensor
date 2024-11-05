@@ -5,7 +5,7 @@
 #define TXD 6
 #define RXD 5
 #define STOP_PIN 8
-#define SENSOR_PIN 0
+#define SENSOR_PIN 4
 #define SAFETY_LEVEL 400
 
 unsigned long buttonOnePressTime = 0;
@@ -43,7 +43,7 @@ void setup() {
 
   // Send SMS to indicate working
   sendSms("The system is working");
-  delay(20000); // allow the MQ2 to warm up
+  delay(60000); // allow the MQ2 to warm up
 }
 
 void loop() {
@@ -53,6 +53,8 @@ void loop() {
   total = total + readings[readIndex];
   readIndex = (readIndex + 1) % numReadings;
   average = total / numReadings;
+
+  int digitalVal = digitalRead(SENSOR_PIN);
 
   // Debug print
   Serial.print("Raw sensor value: ");
@@ -69,7 +71,10 @@ void loop() {
     overrideAlarm();
   }
   // If no override, check gas levels
-  else if (average > SAFETY_LEVEL) {
+  // else if (average > SAFETY_LEVEL) {
+  //   triggerAlarm();
+  // }
+  else if (digitalVal == LOW) {
     triggerAlarm();
   }
   else {
