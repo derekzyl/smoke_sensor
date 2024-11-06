@@ -122,7 +122,7 @@ void updateSerial() {
 void sendSms(String message) {
   mySerial.println("AT+CMGF=1");    //Sets the GSM Module in Text Mode
   delay(1000);
-  mySerial.println("AT+CMGS=\"+2347059011222\"\r"); 
+  mySerial.println("AT+CMGS=\"+2347048729245\"\r"); 
   delay(1000);
   mySerial.println(message);
 
